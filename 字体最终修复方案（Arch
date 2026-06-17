@@ -1,0 +1,216 @@
+下面给你一套**“字体最终修复方案（Arch + Niri + DMS + VSCode + Kitty + opencode 全一致无黑块版）”**。
+
+这套方案的目标只有一个：
+
+> 🚀 所有终端 / GUI / TUI / 编辑器字体完全统一，不再出现黑块、断字、中文异常
+
+---
+
+# 🧠 一、最终架构（你必须按这个理解）
+
+字体不再是“一个字体解决全部”，而是 4 层：
+
+```text
+1️⃣ 英文/代码 → JetBrainsMono Nerd Font Mono
+2️⃣ 图标 → Nerd Fonts Symbols Mono
+3️⃣ 中文 → Noto Sans CJK SC
+4️⃣ Emoji → Noto Color Emoji
+```
+
+---
+
+# 📦 二、系统级安装（必须）
+
+```bash
+sudo pacman -S \
+ttf-jetbrains-mono-nerd \
+noto-fonts \
+noto-fonts-cjk \
+noto-fonts-emoji \
+ttf-nerd-fonts-symbols-mono
+```
+
+---
+
+# ⚙️ 三、🔥 最关键：fontconfig 全局统一（核心修复点）
+
+编辑：
+
+```bash
+~/.config/fontconfig/fonts.conf
+```
+
+写入👇（最终稳定版）
+
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+
+<!-- ========== monospace 主字体链 ========== -->
+<match target="pattern">
+  <test name="family">
+    <string>monospace</string>
+  </test>
+
+  <edit name="family" mode="prepend">
+    <string>JetBrainsMono Nerd Font Mono</string>
+    <string>Noto Sans Mono CJK SC</string>
+  </edit>
+</match>
+
+<!-- ========== sans 中文 fallback ========== -->
+<match target="pattern">
+  <test name="lang" compare="contains">
+    <string>zh</string>
+  </test>
+
+  <edit name="family" mode="prepend">
+    <string>Noto Sans CJK SC</string>
+  </edit>
+</match>
+
+<!-- ========== emoji ========== -->
+<alias>
+  <family>emoji</family>
+  <prefer>
+    <family>Noto Color Emoji</family>
+  </prefer>
+</alias>
+
+</fontconfig>
+```
+
+---
+
+# 🖥 四、VSCode（最容易出问题的地方）
+
+打开 `settings.json`
+
+```json
+"terminal.integrated.fontFamily":
+"JetBrainsMono Nerd Font Mono, Symbols Nerd Font Mono, Noto Sans CJK SC, Noto Color Emoji"
+```
+
+---
+
+### ⚠️ 关键额外设置（必须）
+
+```json
+"terminal.integrated.gpuAcceleration": "off",
+"terminal.integrated.fontLigatures": true
+```
+
+---
+
+# 🐱 五、Kitty（对齐 VSCode）
+
+```conf
+font_family JetBrainsMono Nerd Font Mono
+bold_font auto
+italic_font auto
+
+symbol_map U+4E00-U+9FFF Noto Sans CJK SC
+emoji_font Noto Color Emoji
+```
+
+---
+
+# 🚀 六、opencode / TUI 环境（避免断字符）
+
+确保：
+
+```bash
+export LANG=zh_CN.UTF-8
+export LC_ALL=zh_CN.UTF-8
+export TERM=xterm-256color
+```
+
+👉 已经在你 DMS environment.d 中做过，这里只做确认
+
+---
+
+# 🔥 七、DMS / Niri（你已经做对了）
+
+你现在这个是正确的：
+
+```bash
+~/.config/environment.d/90-dms.conf
+```
+
+内容：
+
+```ini
+LANG=zh_CN.UTF-8
+LC_ALL=zh_CN.UTF-8
+TERM=xterm-256color
+```
+
+✔ 这一步你已经 OK（非常关键）
+
+---
+
+# 🧪 八、最终验证方法（一定要做）
+
+在所有环境运行：
+
+```bash
+echo "中文 test ABC    🌏 ▓▒░"
+```
+
+---
+
+## ✔ 正常结果应该：
+
+* 中文：正常不方块
+* 英文：等宽
+* 图标：正常（无 ■）
+* emoji：彩色
+* 排版：对齐
+
+---
+
+# 🚨 九、如果仍然有黑块（最后兜底）
+
+执行：
+
+```bash
+fc-match monospace
+fc-cache -fv
+```
+
+并检查：
+
+```bash
+fc-list | grep "JetBrainsMono"
+fc-list | grep "Noto Sans CJK"
+```
+
+---
+
+# 🧠 十、最终总结（最重要）
+
+你这套系统最终正确状态是：
+
+```text
+DMS / systemd env → 控制 LANG / TERM
+fontconfig → 控制中文 fallback
+VSCode → 控制 terminal glyph
+Kitty → 对齐渲染
+Noto CJK → 中文兜底
+Nerd Font → 图标核心
+```
+
+---
+
+# 🚀 一句话终极结论
+
+> 字体问题的本质不是“缺字体”，而是 **fontconfig + terminal + Nerd Font 没有统一 fallback 链**
+
+---
+
+如果你愿意，我可以帮你再做一个更高级版本：
+
+> 🔥 “Wayland 全局渲染一致性优化（无锯齿 + 无黑块 + VSCode=Kitty像素级一致）”
+
+这个会再提升一个级别。

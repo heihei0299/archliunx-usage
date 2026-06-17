@@ -221,11 +221,12 @@ lsblk -pf
 
 ### 格式化分区
 
-**千万不要格式化 EFI 分区。**
 
-格式化根分区和 home 分区：
+
+
 
 ```
+mkfs.fat -32 /dev/nvme0n1p1 # efi分区
 mkfs.ext4 /dev/nvme0n1p2    # 根分区
 mkfs.ext4 /dev/nvme0n1p3    # home 分区
 ```
@@ -237,7 +238,7 @@ mkfs.ext4 /dev/nvme0n1p3    # home 分区
 按顺序挂载：
 
 ```
-mount /dev/nvme0n1p2 /mnt                     # 挂载根分区
+mount /dev/nvme0n1p2 /mnt                     # 挂载根分区，优先挂载mnt分区
 mount --mkdir /dev/nvme0n1p3 /mnt/home        # 挂载 home 分区
 mount --mkdir /dev/nvme0n1p1 /mnt/efi         # 挂载 EFI 分区（不格式化）
 ```
@@ -247,13 +248,13 @@ mount --mkdir /dev/nvme0n1p1 /mnt/efi         # 挂载 EFI 分区（不格式化
 复查挂载：
 
 ```
-df -h
+fdisk -l
 ```
 
 ### 安装基础系统
 
 ```
-pacstrap -K /mnt base linux linux-firmware base-devel networkmanager vim sudo grub efibootmgr os-prober exfat-utils intel-ucode
+pacstrap -K /mnt base linux linux-firmware base-devel networkmanager nano  vim sudo grub efibootmgr os-prober exfat-utils intel-ucode
 ```
 
 | 包名 | 作用 |
@@ -426,7 +427,7 @@ visudo
 1. 安装 GRUB 到 EFI 分区
 
     ```
-    grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=ARCH
+    grub-install --target=x86_64-efi --efi-directory=/efi  --boot-directory=/efi  --bootloader-id=ARCH
     ```
 
     | 参数 | 说明 |
@@ -452,10 +453,9 @@ visudo
       `GRUB_CMDLINE_LINUX_DEFAULT` 中去掉 `quiet`，改为：
 
       ```
-      GRUB_CMDLINE_LINUX_DEFAULT="loglevel=5 nowatchdog modprobe.blacklist=iTCO_wdt"
+      GRUB_CMDLINE_LINUX_DEFAULT="loglevel=5 "
       ```
 
-      >Intel CPU 用 `iTCO_wdt`，AMD CPU 用 `sp5100_tco`
 
     - **开启 os-prober 检测 Windows**
 
@@ -465,15 +465,15 @@ visudo
       GRUB_DISABLE_OS_PROBER=false
       ```
 
-    - **禁用 zswap**
-
-      在引号内添加（为了配合后续的 zram）：
-
-      ```
-      GRUB_CMDLINE_LINUX_DEFAULT="... zswap.enabled=0 ..."
-      ```
 
 3. 生成 GRUB 配置文件
+
+
+
+   ```bash
+ln -s /efi/grub/grub.cfg   /boot/grub/grub.cfg     #一些主板会去/boot 文件下找grub的配置文件
+
+  ``` 
 
     ```
     grub-mkconfig -o /boot/grub/grub.cfg
@@ -486,31 +486,6 @@ visudo
     - 是否安装了 `os-prober` 和 `exfat-utils`
     - 是否在 `/etc/default/grub` 中设置了 `GRUB_DISABLE_OS_PROBER=false`
 
-### zram 配置
-
-用内存压缩技术替代 swap，提高内存利用效率。
-
-1. 安装
-
-    ```
-    pacman -S zram-generator
-    ```
-
-2. 编辑配置
-
-    ```
-    vim /etc/systemd/zram-generator.conf
-    ```
-
-    写入：
-
-    ```
-    [zram0]
-    zram-size = ram
-    compression-algorithm = zstd
-    ```
-
-    >`zram-size = ram` 表示使用内存大小作为上限，`zstd` 是高效的压缩算法
 
 3. 由于之前在 grub 配置中禁用了 zswap，zswap 的修改需要重新生成 grub 配置：
 
@@ -518,13 +493,6 @@ visudo
     grub-mkconfig -o /boot/grub/grub.cfg
     ```
 
-### 启用 NetworkManager
-
-```
-systemctl enable NetworkManager
-```
-
->如果之后想用 `iwd` 作为 NetworkManager 的无线后端，可以在安装完成后再配置
 
 ### 退出 chroot 并重启
 
@@ -547,6 +515,15 @@ reboot
 ### 首次启动
 
 1. 登录 root 账户
+
+### 启用 NetworkManager
+
+```
+systemctl enable --now  NetworkManager
+```
+
+>如果之后想用 `iwd` 作为 NetworkManager 的无线后端，可以在安装完成后再配置
+
 
 2. 连接 Wi-Fi
 
